@@ -22,8 +22,8 @@ opensearch_client = OpenSearch(
 
 def lambda_handler(event, context):
     print(event)
+    print("Testing Version V1:1405")
     client = boto3.client('lexv2-runtime')
-
     q = event['queryStringParameters']['q']
     print(q)
 

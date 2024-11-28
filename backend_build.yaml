@@ -2,18 +2,23 @@ version: 0.2
 phases:
   build:
     commands:
-      - echo "Zipping Lambda function..."
+      - echo "Zipping Lambda functions..."
+      # For index-photos
       - cd lambda/index-photos
-      - zip -r ../../index-photos.zip .  # Package the Python script and dependencies
-      - cd lambda/search-photos
-      - zip -r ../../search-photos.zip .
-      - echo "Deploying Lambda function..."
-      
+      - zip -j ../../index-photos.zip lambda_function.py  # Use -j to flatten the directory structure
+      - cd ..
+      # For search-photos
+      - cd search-photos
+      - zip -j ../../search-photos.zip lambda_function.py
+      - cd ../..
+      - echo "Zipping completed."
+
   post_build:
     commands:
-      - echo "Uploading Lambda function"
-      - aws lambda update-function-code --function-name index-photos --zip-file fileb://../../index-photos.zip
-      - aws lambda update-function-code --function-name search-photos --zip-file fileb://../../search-photos.zip
+      - echo "Updating Lambda functions..."
+      - aws lambda update-function-code --function-name index-photos --zip-file fileb://index-photos.zip
+      - aws lambda update-function-code --function-name search-photos --zip-file fileb://search-photos.zip
+      - echo "Lambda function code updated successfully."
 
 artifacts:
   files:
