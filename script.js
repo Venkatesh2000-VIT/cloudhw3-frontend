@@ -108,9 +108,6 @@ document.getElementById('bottom-button').addEventListener('click', function () {
 
 
 
-I am creating a build pipeline in amazon Code Pipeline. Once the git
-
-
 
 
 

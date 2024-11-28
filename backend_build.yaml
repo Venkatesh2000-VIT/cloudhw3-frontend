@@ -1,0 +1,24 @@
+version: 0.2
+phases:
+  build:
+    commands:
+      - echo "Zipping Lambda function..."
+      - cd lambda
+      - cd index-photos
+      - zip -r ../../index-photos.zip lambda_function.py  # Package the Python script and dependencies
+      - cd ..
+      - cd search-photos
+      - zip -r ../../index-photos.zip lambda_function.py
+      - echo "Deploying Lambda function..."
+      
+  post_build:
+    commands:
+      - echo "Uploading Lambda function"
+      - aws lambda update-function-code --function-name index-photos --zip-file fileb://../../index-photos.zip
+      - aws lambda update-function-code --function-name search-photos --zip-file fileb://../../search-photos.zip
+
+artifacts:
+  files:
+    - index-photos.zip
+    - search-photos.zip
+  discard-paths: yes

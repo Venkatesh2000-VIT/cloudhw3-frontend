@@ -19,3 +19,5 @@ cp script.js output/
 echo "Uploading files to S3..."
 aws s3 cp output/index.html s3://hw3frontentbucket/
 aws s3 cp output/script.js s3://hw3frontentbucket/
+
+git remote add origin https://github.com/Venkatesh2000-VIT/cloudhw3-frontend.git
