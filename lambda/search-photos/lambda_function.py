@@ -3,8 +3,6 @@ import boto3
 import json
 
 from opensearchpy import OpenSearch
-from pprint import pprint
-
 
 # Set up OpenSearch client
 host = os.getenv("os_host")

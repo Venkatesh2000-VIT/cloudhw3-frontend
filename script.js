@@ -83,6 +83,8 @@ document.getElementById('bottom-button').addEventListener('click', function () {
             if (response.ok) {
                 console.log('File uploaded successfully:', response);
                 alert('File uploaded successfully.');
+                document.getElementById('file-upload').value = '';
+                document.getElementById('bottom-input').value = '';
             } else {
                 return response.text().then(text => { throw new Error(text) });
             }
