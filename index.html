@@ -35,18 +35,20 @@
         .image-container {
             text-align: center;
             margin-top: 1rem;
+            padding: 0;
+            margin:0;
         }
         .image-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-    gap: 0px; /* Reduced gap */
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 5px; /* Small gap for visual distinction */
 }
 
 .image-grid img {
-    width: 100px;
-    height: auto;
+    width: 200px;
+    height: 200px;
     object-fit: cover;
-    margin: 0; /* Removed margin */
+    margin: 0; 
+    padding: 0; 
 }
 
 /* Center the image if it's the only child */
