@@ -1,0 +1,157 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: "CloudFormation template for Photo-Album-App"
+
+Resources:
+  FrontendBucket:
+    Type: "AWS::S3::Bucket"
+    Properties:
+      WebsiteConfiguration:
+        IndexDocument: index.html
+
+  BackendBucket:
+    Type: "AWS::S3::Bucket"
+    Properties:
+      BucketName: "photo-album-app-backend"
+
+  ApiGatewayS3Role:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: 
+                - apigateway.amazonaws.com
+            Action: "sts:AssumeRole"
+      Policies:
+        - PolicyName: "ApiGatewayS3Policy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "s3:PutObject"
+                  - "s3:GetObject"
+                  - "s3:DeleteObject"
+                Resource: "arn:aws:s3:::photo-album-app-backend/*"
+
+  LambdaExecutionRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: 
+                - lambda.amazonaws.com
+            Action: "sts:AssumeRole"
+      Policies:
+        - PolicyName: "LambdaExecutionPolicy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "logs:*"
+                  - "s3:*"
+                  - "rekognition:*"
+                  - "es:*"
+                  - "lex:*"
+                Resource: "*"
+
+  IndexPhotosLambda:
+    Type: "AWS::Lambda::Function"
+    Properties:
+      Handler: "index-photos.lambda_handler"
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: "vd2348-lambda-code-bucket"
+        S3Key: "index-photos.zip"
+      Runtime: "python3.9"
+
+  SearchPhotosLambda:
+    Type: "AWS::Lambda::Function"
+    Properties:
+      Handler: "search-photos.lambda_handler"
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: "vd2348-lambda-code-bucket"
+        S3Key: "search-photos.zip"
+      Runtime: "python3.9"
+
+  LexBot:
+    Type: "AWS::Lex::Bot"
+    Properties:
+      Name: "PhotoSearchBot"
+      Description: "Bot to search photos"
+      RoleArn: !GetAtt LambdaExecutionRole.Arn
+      IdleSessionTTLInSeconds: 300
+      DataPrivacy: 
+        ChildDirected: false
+
+  ApiGateway:
+    Type: "AWS::ApiGateway::RestApi"
+    Properties:
+      Name: "PhotoAlbumApi"
+
+  ApiResourcePhotos:
+    Type: "AWS::ApiGateway::Resource"
+    Properties:
+      ParentId: !GetAtt ApiGateway.RootResourceId
+      PathPart: "photos"
+      RestApiId: !Ref ApiGateway
+
+  ApiMethodPutPhotos:
+    Type: "AWS::ApiGateway::Method"
+    Properties:
+      AuthorizationType: "NONE"
+      HttpMethod: "PUT"
+      ResourceId: !Ref ApiResourcePhotos
+      RestApiId: !Ref ApiGateway
+      Integration:
+        IntegrationHttpMethod: "PUT"
+        Type: "AWS"
+        Uri: !Sub "arn:aws:apigateway:us-east-1:s3:path/{BackendBucket}/photos"
+        Credentials: !GetAtt ApiGatewayS3Role.Arn
+
+  ApiResourceSearch:
+    Type: "AWS::ApiGateway::Resource"
+    Properties:
+      ParentId: !GetAtt ApiGateway.RootResourceId
+      PathPart: "search"
+      RestApiId: !Ref ApiGateway
+
+  ApiMethodGetSearch:
+    Type: "AWS::ApiGateway::Method"
+    Properties:
+      AuthorizationType: "NONE"
+      HttpMethod: "GET"
+      ResourceId: !Ref ApiResourceSearch
+      RestApiId: !Ref ApiGateway
+      Integration:
+        IntegrationHttpMethod: "POST"
+        Type: "AWS_PROXY"
+        Uri: !Sub "arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/${SearchPhotosLambda.Arn}/invocations"
+
+  LambdaPermissionIndexPhotos:
+    Type: "AWS::Lambda::Permission"
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !Ref IndexPhotosLambda
+      Principal: "s3.amazonaws.com"
+      SourceArn: !Sub "arn:aws:s3:::${BackendBucket}"
+
+  LambdaPermissionSearchPhotos:
+    Type: "AWS::Lambda::Permission"
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !Ref SearchPhotosLambda
+      Principal: "apigateway.amazonaws.com"
+      SourceArn: !Sub "arn:aws:execute-api:us-east-1:615299770329:${ApiGateway}/*/GET/search"
+
+Outputs:
+  FrontendBucketURL:
+    Description: "URL of the frontend S3 bucket"
+    Value: !GetAtt FrontendBucket.WebsiteURL

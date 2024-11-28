@@ -1,0 +1,470 @@
+<!-- <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cloud Assignment 3</title>
+    <!-- Bootstrap CSS -->
+    <link
+        href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+        rel="stylesheet"
+    />
+    <style>
+        body, html {
+            height: 100%;
+            margin: 0;
+        }
+        .heading-bar {
+            background-color: #007bff; /* Customize the color */
+            color: white;
+            text-align: center;
+            padding: 10px 0;
+        }
+        .centered-division {
+            height: 50%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        .dynamic-content {
+            width: 100%;
+            display: none; /* Initially collapsed */
+            margin-top: 1rem;
+        }
+        .image-container {
+            text-align: center;
+            margin-top: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="heading-bar"></div>
+        <h1>Dynamic Image Page</h1>
+    </div>
+    <!-- Heading Bar -->
+    <div class="centered-division container">
+        <!-- Input and Button (Top) -->
+        <div class="mb-3" style="width: 75%;">
+            <label for="top-input" class="form-label">Search labels</label>
+            <div class="input-group">
+                <div class="row">
+                    <div class="col-10">
+                        <input type="text" class="form-control" id="top-input" placeholder="Enter Search Query">
+                    </div>
+                    <div class="col-2">
+                        <button class="btn btn-primary" id="top-button">Submit</button>
+                    </div>
+                </div>
+                <!-- <input type="text" class="form-control" id="top-input" placeholder="Enter Search Query">
+                <button class="btn btn-primary" id="top-button">Submit</button> -->
+            </div>
+        </div>
+
+        <!-- Dynamic Content Division -->
+        <div id="dynamic-content" class="dynamic-content">
+            <div id="image-container" class="image-container"></div>
+        </div>
+
+        <div class="mt-3" style="width: 75%;">
+            <label for="custom-labels" class="form-label">Labels separated by comma</label>
+            <div class="row">
+                <div class="col-6">
+                    <input type="text" class="form-control" id="custom-labels" placeholder="Enter custom labels">
+                </div>
+                <div class="col-4">
+                    <input type="file" class="form-control" id="file-upload">
+                </div>
+                <div class="col-2">
+                    <button class="btn btn-primary w-100" id="bottom-button">Upload</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Custom Script -->
+    <script src="script.js"></script>
+</body>
+</html> -->
+
+
+
+
+
+AWSTemplateFormatVersion: '2010-09-09'
+Resources:
+  PhotosBucket:
+    Type: 'AWS::S3::Bucket'
+    DependsOn: IndexPhotosFunction
+    Properties:
+      BucketName: 'photos-bucket-cloudformation'
+      NotificationConfiguration:
+        LambdaConfigurations:
+          - Event: 's3:ObjectCreated:*'
+            Function: !GetAtt IndexPhotosFunction.Arn
+
+  
+  FrontendBucket:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      BucketName: 'frontend-bucket-cloudformation'
+      WebsiteConfiguration:
+        IndexDocument: 'index.html'
+        ErrorDocument: 'error.html'
+
+  IndexPhotosFunction:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      FunctionName: 'index-photos-cloudformation'
+      Handler: 'index.handler'
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Runtime: 'python3.9'
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import datetime
+          from elasticsearch import Elasticsearch, RequestsHttpConnection
+          from requests_aws4auth import AWS4Auth
+
+          def handler(event, context):
+              rekognition = boto3.client('rekognition')
+              s3 = boto3.client('s3')
+              es = Elasticsearch(
+                  hosts=[{'host': 'your-elasticsearch-domain', 'port': 443}],
+                  http_auth=AWS4Auth('your-access-key', 'your-secret-key', 'your-region', 'es'),
+                  use_ssl=True,
+                  verify_certs=True,
+                  connection_class=RequestsHttpConnection
+              )
+              for record in event['Records']:
+                  bucket = record['s3']['bucket']['name']
+                  key = record['s3']['object']['key']
+                  response = rekognition.detect_labels(
+                      Image={'S3Object': {'Bucket': bucket, 'Name': key}},
+                      MaxLabels=10
+                  )
+                  labels = [label['Name'] for label in response['Labels']]
+                  metadata = s3.head_object(Bucket=bucket, Key=key)['Metadata']
+                  custom_labels = metadata.get('x-amz-meta-customlabels', '').split(',')
+                  labels.extend(custom_labels)
+                  document = {
+                      'objectKey': key,
+                      'bucket': bucket,
+                      'createdTimestamp': datetime.datetime.now().isoformat(),
+                      'labels': labels
+                  }
+                  es.index(index='photos', doc_type='_doc', body=document)
+
+  SearchPhotosFunction:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      FunctionName: 'search-photos-cloudformation'
+      Handler: 'search.handler'
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Runtime: 'python3.9'
+      Code:
+        ZipFile: |
+          import json
+          from elasticsearch import Elasticsearch, RequestsHttpConnection
+          from requests_aws4auth import AWS4Auth
+
+          def handler(event, context):
+              es = Elasticsearch(
+                  hosts=[{'host': 'your-elasticsearch-domain', 'port': 443}],
+                  http_auth=AWS4Auth('your-access-key', 'your-secret-key', 'your-region', 'es'),
+                  use_ssl=True,
+                  verify_certs=True,
+                  connection_class=RequestsHttpConnection
+              )
+              query = event['queryStringParameters']['q']
+              response = es.search(
+                  index='photos',
+                  body={
+                      'query': {
+                          'match': {
+                              'labels': query
+                          }
+                      }
+                  }
+              )
+              return {
+                  'statusCode': 200,
+                  'body': json.dumps(response['hits']['hits'])
+              }
+
+  LambdaExecutionRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: 'Allow'
+            Principal:
+              Service: 'lambda.amazonaws.com'
+            Action: 'sts:AssumeRole'
+      Policies:
+        - PolicyName: 'LambdaS3Policy'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: 'Allow'
+                Action:
+                  - 's3:GetObject'
+                  - 's3:PutObject'
+                  - 's3:ListBucket'
+                Resource: '*'
+              - Effect: 'Allow'
+                Action:
+                  - 'rekognition:DetectLabels'
+                Resource: '*'
+              - Effect: 'Allow'
+                Action:
+                  - 'es:ESHttpPost'
+                  - 'es:ESHttpPut'
+                  - 'es:ESHttpGet'
+                Resource: '*'
+              - Effect: 'Allow'
+                Action: 
+                  - 'lambda:InvokeFunction'
+                Resource: !GetAtt IndexPhotosFunction.Arn  # Grant permission for S3 to invoke Lambda
+
+
+
+  ApiGateway:
+    Type: 'AWS::ApiGateway::RestApi'
+    Properties:
+      Name: 'PhotoAlbumAPI'
+      Description: 'API for photo album application'
+
+  PutPhotosMethod:
+    Type: 'AWS::ApiGateway::Method'
+    Properties:
+      AuthorizationType: 'NONE'
+      HttpMethod: 'PUT'
+      ResourceId: !GetAtt ApiGateway.RootResourceId
+      RestApiId: !Ref ApiGateway
+      Integration:
+        IntegrationHttpMethod: 'PUT'
+        Type: 'AWS_PROXY'
+        Uri: !Sub 'arn:aws:apigateway:us-east-1:s3:path/${PhotosBucket}'
+
+  SearchPhotosMethod:
+    Type: 'AWS::ApiGateway::Method'
+    Properties:
+      AuthorizationType: 'NONE'
+      HttpMethod: 'GET'
+      ResourceId: !GetAtt ApiGateway.RootResourceId
+      RestApiId: !Ref ApiGateway
+      Integration:
+        IntegrationHttpMethod: 'POST'
+        Type: 'AWS_PROXY'
+        Uri: !Sub 'arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/${SearchPhotosFunction.Arn}/invocations'
+
+  ApiGatewayDeployment:
+    Type: 'AWS::ApiGateway::Deployment'
+    Properties:
+      RestApiId: !Ref ApiGateway
+      StageName: 'prod'
+    DependsOn:
+      - PutPhotosMethod
+      - SearchPhotosMethod
+
+Outputs:
+  FrontendBucketURL:
+    Description: 'URL for the frontend bucket'
+    Value: !GetAtt FrontendBucket.WebsiteURL
+
+
+
+
+
+
+
+    AWSTemplateFormatVersion: '2010-09-09'
+    Resources:
+      PhotosBucket:
+        Type: 'AWS::S3::Bucket'
+        DependsOn: IndexPhotosFunction
+        Properties:
+          BucketName: 'photos-bucket-cloudformation'
+          NotificationConfiguration:
+            LambdaConfigurations:
+              - Event: 's3:ObjectCreated:*'
+                Function: !GetAtt IndexPhotosFunction.Arn
+    
+      
+      FrontendBucket:
+        Type: 'AWS::S3::Bucket'
+        Properties:
+          BucketName: 'frontend-bucket-cloudformation'
+          WebsiteConfiguration:
+            IndexDocument: 'index.html'
+            ErrorDocument: 'error.html'
+    
+      IndexPhotosFunction:
+        Type: 'AWS::Lambda::Function'
+        Properties:
+          FunctionName: 'index-photos-cloudformation'
+          Handler: 'index.handler'
+          Role: !GetAtt LambdaExecutionRole.Arn
+          Runtime: 'python3.9'
+          Code:
+            ZipFile: |
+              import json
+              import boto3
+              import datetime
+              from elasticsearch import Elasticsearch, RequestsHttpConnection
+              from requests_aws4auth import AWS4Auth
+    
+              def handler(event, context):
+                  rekognition = boto3.client('rekognition')
+                  s3 = boto3.client('s3')
+                  es = Elasticsearch(
+                      hosts=[{'host': 'your-elasticsearch-domain', 'port': 443}],
+                      http_auth=AWS4Auth('your-access-key', 'your-secret-key', 'your-region', 'es'),
+                      use_ssl=True,
+                      verify_certs=True,
+                      connection_class=RequestsHttpConnection
+                  )
+                  for record in event['Records']:
+                      bucket = record['s3']['bucket']['name']
+                      key = record['s3']['object']['key']
+                      response = rekognition.detect_labels(
+                          Image={'S3Object': {'Bucket': bucket, 'Name': key}},
+                          MaxLabels=10
+                      )
+                      labels = [label['Name'] for label in response['Labels']]
+                      metadata = s3.head_object(Bucket=bucket, Key=key)['Metadata']
+                      custom_labels = metadata.get('x-amz-meta-customlabels', '').split(',')
+                      labels.extend(custom_labels)
+                      document = {
+                          'objectKey': key,
+                          'bucket': bucket,
+                          'createdTimestamp': datetime.datetime.now().isoformat(),
+                          'labels': labels
+                      }
+                      es.index(index='photos', doc_type='_doc', body=document)
+    
+      SearchPhotosFunction:
+        Type: 'AWS::Lambda::Function'
+        Properties:
+          FunctionName: 'search-photos-cloudformation'
+          Handler: 'search.handler'
+          Role: !GetAtt LambdaExecutionRole.Arn
+          Runtime: 'python3.9'
+          Code:
+            ZipFile: |
+              import json
+              from elasticsearch import Elasticsearch, RequestsHttpConnection
+              from requests_aws4auth import AWS4Auth
+    
+              def handler(event, context):
+                  es = Elasticsearch(
+                      hosts=[{'host': 'your-elasticsearch-domain', 'port': 443}],
+                      http_auth=AWS4Auth('your-access-key', 'your-secret-key', 'your-region', 'es'),
+                      use_ssl=True,
+                      verify_certs=True,
+                      connection_class=RequestsHttpConnection
+                  )
+                  query = event['queryStringParameters']['q']
+                  response = es.search(
+                      index='photos',
+                      body={
+                          'query': {
+                              'match': {
+                                  'labels': query
+                              }
+                          }
+                      }
+                  )
+                  return {
+                      'statusCode': 200,
+                      'body': json.dumps(response['hits']['hits'])
+                  }
+    
+      LambdaExecutionRole:
+        Type: 'AWS::IAM::Role'
+        Properties:
+          AssumeRolePolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: 'Allow'
+                Principal:
+                  Service: 'lambda.amazonaws.com'
+                Action: 'sts:AssumeRole'
+          Policies:
+            - PolicyName: 'LambdaS3Policy'
+              PolicyDocument:
+                Version: '2012-10-17'
+                Statement:
+                  - Effect: 'Allow'
+                    Action:
+                      - 's3:GetObject'
+                      - 's3:PutObject'
+                      - 's3:ListBucket'
+                    Resource: '*'
+                  - Effect: 'Allow'
+                    Action:
+                      - 'rekognition:DetectLabels'
+                    Resource: '*'
+                  - Effect: 'Allow'
+                    Action:
+                      - 'es:ESHttpPost'
+                      - 'es:ESHttpPut'
+                      - 'es:ESHttpGet'
+                    Resource: '*'
+                  - Effect: 'Allow'
+                    Action: 
+                      - 'lambda:InvokeFunction'
+                    Resource: !GetAtt IndexPhotosFunction.Arn  # Grant permission for S3 to invoke Lambda
+    
+    
+    
+      ApiGateway:
+        Type: 'AWS::ApiGateway::RestApi'
+        Properties:
+          Name: 'PhotoAlbumAPI'
+          Description: 'API for photo album application'
+    
+      PutPhotosMethod:
+        Type: 'AWS::ApiGateway::Method'
+        Properties:
+          AuthorizationType: 'NONE'
+          HttpMethod: 'PUT'
+          ResourceId: !GetAtt ApiGateway.RootResourceId
+          RestApiId: !Ref ApiGateway
+          Integration:
+            IntegrationHttpMethod: 'PUT'
+            Type: 'AWS_PROXY'
+            Uri: !Sub 'arn:aws:apigateway:us-east-1:s3:path/${PhotosBucket}'
+    
+      SearchPhotosMethod:
+        Type: 'AWS::ApiGateway::Method'
+        Properties:
+          AuthorizationType: 'NONE'
+          HttpMethod: 'GET'
+          ResourceId: !GetAtt ApiGateway.RootResourceId
+          RestApiId: !Ref ApiGateway
+          Integration:
+            IntegrationHttpMethod: 'POST'
+            Type: 'AWS_PROXY'
+            Uri: !Sub 'arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/${SearchPhotosFunction.Arn}/invocations'
+    
+      ApiGatewayDeployment:
+        Type: 'AWS::ApiGateway::Deployment'
+        Properties:
+          RestApiId: !Ref ApiGateway
+          StageName: 'prod'
+        DependsOn:
+          - PutPhotosMethod
+          - SearchPhotosMethod
+    
+    Outputs:
+      FrontendBucketURL:
+        Description: 'URL for the frontend bucket'
+        Value: !GetAtt FrontendBucket.WebsiteURL
+    
+    

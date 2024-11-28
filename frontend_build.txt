@@ -1,0 +1,21 @@
+build:
+    commands:
+      - echo "Extracting files..."
+      - ls
+      - mkdir -p output
+      - cp indexed output/
+      - cp script.js output/
+      - echo "Uploading files to S3..."
+      - aws s3 cp output/index.html s3://your-s3-bucket-name/
+      - aws s3 cp output/script.js s3://your-s3-bucket-name/
+
+
+
+echo "Extracting files..."
+ls
+mkdir -p output
+cp index.html output/
+cp script.js output/
+echo "Uploading files to S3..."
+aws s3 cp output/index.html s3://hw3frontentbucket/
+aws s3 cp output/script.js s3://hw3frontentbucket/

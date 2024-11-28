@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cloud Assigment 3</title>
+    <!-- Bootstrap CSS -->
+    <link
+        href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+        rel="stylesheet"
+    />
+    <style>
+        body, html {
+            height: 100%;
+            margin: 0;
+        }
+        .heading-bar {
+            background-color: #007bff; /* Customize the color */
+            color: white;
+            text-align: center;
+            padding: 10px 0;
+        }
+        .centered-division {
+            height: 50%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        .dynamic-content {
+            width: 100%;
+            display: none; /* Initially collapsed */
+            margin-top: 1rem;
+        }
+        .image-container {
+            text-align: center;
+            margin-top: 1rem;
+        }
+        .image-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    gap: 10px;
+}
+
+.image-grid img {
+    width: 100%;
+    height: auto;
+    object-fit: cover;
+}
+    </style>
+</head>
+<body>
+    <!-- Heading Bar -->
+    <div class="heading-bar">
+        <h1>Cloud Assignment 3</h1>
+    </div>
+
+    <!-- Main Content -->
+    <div class="centered-division container">
+        <!-- Input and Button (Top) -->
+        <div class="mb-3" style="width: 75%;">
+            <label for="top-input" class="form-label">Enter Search Query</label>
+            <div class="input-group">
+                <input type="text" class="form-control" id="top-input" placeholder="Enter Search Query">
+                <button class="btn btn-primary" id="top-button">Submit</button>
+            </div>
+        </div>
+
+        <!-- Dynamic Content Division -->
+        <div id="dynamic-content" class="dynamic-content">
+            <div id="image-container" class="image-container"></div>
+        </div>
+
+      
+        <div class="mt-3" style="width: 75%;">
+            <label for="bottom-input" class="form-label">Labels comma separated</label>
+            <div class="input-group">
+                <input type="text" class="form-control" id="bottom-input" placeholder="Enter Labels comma separated" style="flex: 7;" >
+                <input
+                    type="file"
+                    class="form-control"
+                    id="file-upload"
+                    style="flex: 2;"
+                >
+                <button class="btn btn-primary" id="bottom-button" style="flex: 1;">Submit</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/js/apiGateway-js-sdk/apigClient.js"></script>
+
+    <script src="./js/apiGateway-js-sdk/lib/axios/dist/axios.standalone.js"></script>
+    <script src="./js/apiGateway-js-sdk/lib/CryptoJS/rollups/crypto-js.js"></script>
+    <script src="./js/apiGateway-js-sdk/lib/CryptoJS/rollups/sha256.js"></script>
+    <script src="./js/apiGateway-js-sdk/lib/CryptoJS/components/enc-base64.js"></script>
+    <script src="./js/apiGateway-js-sdk/lib/CryptoJS/components/hmac.js"></script>
+    <script src="./js/apiGateway-js-sdk/lib/url-template/url-template.js"></script>
+    <script src="./js/apiGateway-js-sdk/lib/apiGatewayCore/sigV4Client.js"></script>
+    <script src="./js/apiGateway-js-sdk/lib/apiGatewayCore/apiGatewayClient.js"></script>
+    <script src="./js/apiGateway-js-sdk/lib/apiGatewayCore/simpleHttpClient.js"></script>
+    <script src="./js/apiGateway-js-sdk/lib/apiGatewayCore/utils.js"></script>
+    <!-- Custom Script -->
+    <script src="script.js"></script>
+</body>
+</html>
